@@ -126,7 +126,7 @@ Keep responses concise for voice (2-4 sentences).`;
       completion?.choices?.[0]?.message?.content ||
       "Sorry, I couldn't respond.";
 
-    
+
     try {
       await supabase.from("api_usage").insert([
         {

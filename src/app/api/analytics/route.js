@@ -61,6 +61,13 @@ export async function GET(req) {
       last7Days.push({ date: d.toISOString().slice(0, 10), calls: count });
     }
 
+    let usageQuery = supabase.from("api_usage").select("tokens_used");
+    if (userId) {
+      usageQuery = usageQuery.eq("user_id", userId);
+    }
+    const { data: usageData } = await usageQuery;
+    const totalTokensUsed = usageData ? usageData.reduce((sum, record) => sum + (record.tokens_used || 0), 0) : 0;
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -71,6 +78,7 @@ export async function GET(req) {
           avgDurationFormatted: `${Math.floor(avgDurationSeconds / 60)}m ${avgDurationSeconds % 60}s`,
           successRate,
           callsOverTime: last7Days,
+          totalTokensUsed,
         },
       }),
       { headers: { "Content-Type": "application/json" } }

@@ -21,6 +21,9 @@ export default function Navbar() {
             <Link href="/voice" className="hover:text-blue-400 transition">
               Voice Call
             </Link>
+            <Link href="/analytics" className="hover:text-blue-400 transition">
+              Analytics
+            </Link>
             <Link href="/call-history" className="hover:text-blue-400 transition">
               Call History
             </Link>

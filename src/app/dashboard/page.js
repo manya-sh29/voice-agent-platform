@@ -14,9 +14,6 @@ export default function DashboardPage() {
   const [transcript, setTranscript] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState(null);
 
-  const [callsToday, setCallsToday] = useState(0);
-  const [apiUsage, setApiUsage] = useState(0);
-
   const mediaRecorderRef = useRef(null);
   const { addMessage, getFullContext } = useVoiceAgentContext();
 
@@ -176,30 +173,17 @@ export default function DashboardPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // ---------- Calls Today ----------
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayEnd = new Date();
-        todayEnd.setHours(23, 59, 59, 999);
-
-        const { count: callsCount, error: callsError } = await supabase
-          .from("voice_logs")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .gte("call_start", todayStart.toISOString())
-          .lte("call_start", todayEnd.toISOString());
-
-        if (callsError) console.error("Calls Today fetch error:", callsError);
-        setCallsToday(callsCount || 0);
-
-        // ---------- API Usage ----------
-        const { count: usageCount, error: usageError } = await supabase
-          .from("api_usage")
-          .select("*", { count: "exact", head: true })
+        // ---------- Active Agents ----------
+        const { data: agentsData, error: agentsError } = await supabase
+          .from("agents")
+          .select("id, name")
           .eq("user_id", user.id);
-
-        if (usageError) console.error("API Usage fetch error:", usageError);
-        setApiUsage(usageCount || 0);
+          
+        if (agentsError) {
+          console.error("Agents fetch error:", agentsError);
+        } else if (agentsData) {
+          setAgents(agentsData);
+        }
 
       } catch (err) {
         console.error("Dashboard stats fetch error:", err);
@@ -234,14 +218,6 @@ export default function DashboardPage() {
         <div className="bg-zinc-900 p-4 rounded">
           <h2 className="text-lg font-semibold">Active Agents</h2>
           <p className="text-2xl font-bold mt-2">{agents.length}</p>
-        </div>
-        <div className="bg-zinc-900 p-4 rounded">
-          <h2 className="text-lg font-semibold">Calls Today</h2>
-          <p className="text-2xl font-bold mt-2">{callsToday}</p>
-        </div>
-        <div className="bg-zinc-900 p-4 rounded">
-          <h2 className="text-lg font-semibold">API Usage</h2>
-          <p className="text-2xl font-bold mt-2">{apiUsage}</p>
         </div>
       </div>
 
