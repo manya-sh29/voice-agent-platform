@@ -1,40 +1,18 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Room } from "livekit-client";
 
 export default function VoiceRecorder() {
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
 
-  const roomRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // ==================== Connect to LiveKit ====================
-  const connectToLiveKit = async () => {
-    const room = new Room();
-    roomRef.current = room;
-
-    const res = await fetch("/api/livekit-token");
-    const { token } = await res.json();
-
-    await room.connect(
-      process.env.NEXT_PUBLIC_LIVEKIT_URL,
-      token
-    );
-
-    console.log(" Connected to LiveKit");
-
-    await room.localParticipant.enableMicrophone();
-  };
-
+  // ===================== Voice Recording =====================
   const startRecording = async () => {
     try {
-      //  Connect LiveKit First
-      await connectToLiveKit();
-
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const mediaRecorder = new MediaRecorder(stream);
@@ -48,13 +26,11 @@ export default function VoiceRecorder() {
       };
 
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
-        });
-
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
 
+        // Upload audio to backend
         await uploadAudio(blob);
       };
 
@@ -67,14 +43,9 @@ export default function VoiceRecorder() {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
       setRecording(false);
-    }
-
-    if (roomRef.current) {
-      roomRef.current.disconnect();
-      console.log(" Disconnected from LiveKit");
     }
   };
 
@@ -85,10 +56,7 @@ export default function VoiceRecorder() {
       const formData = new FormData();
       formData.append("audio", blob, `voice-${Date.now()}.webm`);
 
-      const res = await fetch("/api/voice", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("/api/voice", { method: "POST", body: formData });
 
       if (!res.ok) {
         console.error("Voice API failed");
@@ -101,7 +69,6 @@ export default function VoiceRecorder() {
 
       const aiAudio = new Audio(aiAudioUrl);
       aiAudio.play();
-
     } catch (err) {
       console.error("Upload error:", err);
       alert("Audio upload error. Check console.");
@@ -127,9 +94,7 @@ export default function VoiceRecorder() {
       </button>
 
       {uploading && (
-        <p className="mt-2 text-sm text-yellow-400">
-          Processing voice...
-        </p>
+        <p className="mt-2 text-sm text-yellow-400">Processing voice...</p>
       )}
 
       {audioUrl && (
