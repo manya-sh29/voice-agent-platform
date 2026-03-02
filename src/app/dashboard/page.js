@@ -5,6 +5,9 @@ import { supabase } from "../../lib/supabaseClient";
 import Link from "next/link";
 import { useVoiceAgentContext } from "../context/VoiceAgentContext";
 
+// ====== LiveKit imports ======
+import { Room, createLocalAudioTrack } from "livekit-client";
+
 export default function DashboardPage() {
   const [agents, setAgents] = useState([]);
   const [recording, setRecording] = useState(false);
@@ -16,6 +19,44 @@ export default function DashboardPage() {
 
   const mediaRecorderRef = useRef(null);
   const { addMessage, getFullContext } = useVoiceAgentContext();
+
+  // =================== LiveKit state ===================
+  const [liveKitRoom, setLiveKitRoom] = useState(null);
+  let liveKitAudioTrack = null; // track for syncing with recording
+
+  // Connect to LiveKit room on dashboard load
+  useEffect(() => {
+    const initLiveKit = async () => {
+      try {
+        const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+        const LIVEKIT_TOKEN = process.env.NEXT_PUBLIC_LIVEKIT_TOKEN;
+
+        if (!LIVEKIT_URL || !LIVEKIT_TOKEN) {
+          console.warn("LiveKit URL or Token missing. Skipping connection.");
+          return;
+        }
+
+        // Create Room instance
+        const room = new Room();
+
+        // Connect to LiveKit server
+        await room.connect(LIVEKIT_URL, LIVEKIT_TOKEN);
+        setLiveKitRoom(room);
+        console.log("Connected to LiveKit");
+
+        // Optional: handle remote audio tracks
+        room.on("trackSubscribed", (track, participant) => {
+          if (track.kind === "audio") {
+            track.play();
+          }
+        });
+      } catch (err) {
+        console.error("LiveKit init error:", err);
+      }
+    };
+
+    initLiveKit();
+  }, []);
 
   const templates = [
     {
@@ -80,7 +121,7 @@ export default function DashboardPage() {
     else {
       alert(`Agent "${template.name}" created successfully!`);
       setAgents((prev) => [...prev, data[0]]);
-      setSelectedAgentId(data[0].id); // automatically select new agent
+      setSelectedAgentId(data[0].id);
     }
   };
 
@@ -103,10 +144,23 @@ export default function DashboardPage() {
         const audioBlob = new Blob(chunks, { type: "audio/webm" });
         setRecording(false);
         await processAudio(audioBlob);
+
+        if (liveKitAudioTrack && liveKitRoom) {
+          liveKitRoom.localParticipant.unpublishTrack(liveKitAudioTrack);
+          liveKitAudioTrack.stop();
+          liveKitAudioTrack = null;
+          console.log("LiveKit mic stopped");
+        }
       };
 
       mediaRecorder.start();
       setRecording(true);
+
+      if (liveKitRoom) {
+        liveKitAudioTrack = await createLocalAudioTrack({});
+        await liveKitRoom.localParticipant.publishTrack(liveKitAudioTrack);
+        console.log("LiveKit mic started");
+      }
     } catch (err) {
       console.error("Microphone error:", err);
       alert("Error accessing microphone. Allow microphone permissions.");
@@ -173,7 +227,6 @@ export default function DashboardPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // ---------- Active Agents ----------
         const { data: agentsData, error: agentsError } = await supabase
           .from("agents")
           .select("id, name")
@@ -184,7 +237,6 @@ export default function DashboardPage() {
         } else if (agentsData) {
           setAgents(agentsData);
         }
-
       } catch (err) {
         console.error("Dashboard stats fetch error:", err);
       }

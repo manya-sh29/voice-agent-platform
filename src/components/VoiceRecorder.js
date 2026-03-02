@@ -1,18 +1,40 @@
-// src/components/VoiceRecorder.js
 "use client";
 
 import { useState, useRef } from "react";
+import { Room } from "livekit-client";
 
 export default function VoiceRecorder() {
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  const roomRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // ==================== Start Recording ====================
+  // ==================== Connect to LiveKit ====================
+  const connectToLiveKit = async () => {
+    const room = new Room();
+    roomRef.current = room;
+
+    const res = await fetch("/api/livekit-token");
+    const { token } = await res.json();
+
+    await room.connect(
+      process.env.NEXT_PUBLIC_LIVEKIT_URL,
+      token
+    );
+
+    console.log(" Connected to LiveKit");
+
+    await room.localParticipant.enableMicrophone();
+  };
+
   const startRecording = async () => {
     try {
+      //  Connect LiveKit First
+      await connectToLiveKit();
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const mediaRecorder = new MediaRecorder(stream);
@@ -44,15 +66,18 @@ export default function VoiceRecorder() {
     }
   };
 
-  // ==================== Stop Recording ====================
   const stopRecording = () => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
       setRecording(false);
     }
+
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+      console.log(" Disconnected from LiveKit");
+    }
   };
 
-  // ==================== Upload Audio ====================
   const uploadAudio = async (blob) => {
     setUploading(true);
 
@@ -71,11 +96,9 @@ export default function VoiceRecorder() {
         return;
       }
 
-      // ✅ IMPORTANT: backend returns MP3 → read as blob
       const aiAudioBlob = await res.blob();
       const aiAudioUrl = URL.createObjectURL(aiAudioBlob);
 
-      // Play AI response
       const aiAudio = new Audio(aiAudioUrl);
       aiAudio.play();
 
