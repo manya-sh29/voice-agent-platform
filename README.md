@@ -229,6 +229,22 @@ voice-agent-platform/
 ```
 
 
+
+# API Routes
+```
+Endpoint	Method	Purpose
+/api/voice	POST	Receives audio, runs STT → LLM → TTS, stores logs, returns transcript + reply + audio
+/api/livekit-token	POST	Generates LiveKit access token for real-time rooms
+/api/call-history	GET	Fetches voice_logs for a user with agent names
+/api/analytics	GET	Computes metrics (total calls, today, avg duration, success rate, usage, chart data)
+/api/call-scorecard/[id]	GET	Returns scorecard for a call (quality, accuracy, sentiment, topics)
+/api/export-transcript/[id]	GET	Exports transcript as TXT or PDF
+/api/knowledge/upload	POST	Extracts text from PDF/TXT, appends to agent knowledge_base
+/api/agents/[id]	PATCH	Updates agent
+/api/agents/[id]	DELETE	Deletes agent
+
+```
+
 # Project Flow
 
 ```
@@ -254,10 +270,7 @@ User
   │ Converts AI text to speech
   ▼
 [Server]
-  │ Streams audio back to LiveKit
-  ▼
-[LiveKit]
-  │ Plays AI-generated audio
+  │ Streams audio back 
   ▼
 User
 
